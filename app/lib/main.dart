@@ -15,17 +15,30 @@ class AstraAI extends StatelessWidget {
       theme: ThemeData.dark(),
       home: Scaffold(
         appBar: AppBar(
-          title: const Text("AstraAI"),
+          title: const Text("AstraAI Assistant"),
         ),
-        body: const Center(
-          child: Text(
-            "Hello, I am AstraAI 🚀",
-            style: TextStyle(fontSize: 24),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.smart_toy,
+                size: 100,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Hello, I am AstraAI",
+                style: TextStyle(fontSize: 24),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {},
+                child: const Text("🎤 Speak"),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-
-
