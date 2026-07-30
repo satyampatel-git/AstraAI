@@ -23,14 +23,9 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Accept Android Licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
       - name: Build APK
         run: |
           cd app
-          chmod +x android/gradlew || true
-          flutter clean
           flutter pub get
           flutter build apk --debug
 
