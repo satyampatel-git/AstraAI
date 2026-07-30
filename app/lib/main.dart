@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const AstraAIApp());
@@ -35,29 +37,81 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _messages = [
-    {"role": "assistant", "content": "Hello! Main AstraAI hoon. Aapka personal AI assistant. Aaj hum kya banayein?"}
+    {"role": "assistant", "content": "Hello! Main AstraAI hoon. Main aapki kya madad kar sakta hoon?"}
   ];
   
   bool _isLoading = false;
   
-  // Replace with your API key or pass dynamically
+  // Replace with your API key
   static const String _apiKey = "YOUR_GEMINI_API_KEY_HERE";
   GenerativeModel? _model;
+  ChatSession? _chat;
+
+  // Speech to Text members
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
+    _requestMicrophonePermission();
     if (_apiKey != "YOUR_GEMINI_API_KEY_HERE") {
       _model = GenerativeModel(
         model: 'gemini-1.5-flash',
         apiKey: _apiKey,
       );
+      _chat = _model!.startChat();
+    }
+  }
+
+  Future<void> _requestMicrophonePermission() async {
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Microphone permission denied. Voice feature unavailable.")),
+      );
+    }
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      final available = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done') {
+            setState(() => _isListening = false);
+            if(_controller.text.isNotEmpty) {
+               _sendMessage();
+            }
+          }
+        },
+        onError: (error) => print('Error: $error'),
+      );
+
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (result) {
+            setState(() {
+              _controller.text = result.recognizedWords;
+            });
+          },
+          listenMode: stt.ListenMode.confirmation,
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
     }
   }
 
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
+
+    if(_speech.isListening){
+       _speech.stop();
+       setState(() => _isListening = false);
+    }
 
     setState(() {
       _messages.add({"role": "user", "content": text});
@@ -67,16 +121,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       if (_model == null) {
-        // Fallback response if API Key is not set yet
         await Future.delayed(const Duration(seconds: 1));
         setState(() {
           _messages.add({
             "role": "assistant",
-            "content": "API Key abhi set nahi hai! Kripya 'YOUR_GEMINI_API_KEY_HERE' ki jagah apni Gemini API Key dalein."
+            "content": "API Key abhi set nahi hai! Kripya code mein 'YOUR_GEMINI_API_KEY_HERE' ko apni API Key se replace karein."
           });
         });
       } else {
-        final response = await _model!.generateContent([Content.text(text)]);
+        final content = Content.text(text);
+        final response = await _chat!.sendMessage(content);
         setState(() {
           _messages.add({
             "role": "assistant", 
@@ -104,16 +158,9 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF161A23),
         elevation: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.auto_awesome, color: Color(0xFF6C5CE7), size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'AstraAI',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ],
+        title: Text(
+          'AstraAI',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
       ),
@@ -150,7 +197,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_isLoading)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
+              padding: EdgeInsets.all(16.0),
               child: SpinKitThreeBounce(
                 color: Color(0xFF6C5CE7),
                 size: 24.0,
@@ -164,7 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _controller,
                     style: const TextStyle(color: Colors.white),
-                    onSubmitted: (_) => _sendMessage(),
+                    maxLines: null,
                     decoration: InputDecoration(
                       hintText: 'AstraAI se kuch bhi poochein...',
                       hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
@@ -180,13 +227,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 CircleAvatar(
-                  backgroundColor: const Color(0xFF6C5CE7),
+                  backgroundColor: _isListening ? Colors.red : const Color(0xFF6C5CE7),
                   radius: 24,
                   child: IconButton(
-                    onPressed: _sendMessage,
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    onPressed: _listen,
+                    icon: Icon(
+                        _isListening ? Icons.mic : Icons.mic_none,
+                        color: Colors.white, size: 24),
                   ),
                 ),
+                if (_controller.text.isNotEmpty)
+                  const SizedBox(width: 8),
+                if (_controller.text.isNotEmpty)
+                   CircleAvatar(
+                    backgroundColor: const Color(0xFF6C5CE7),
+                    radius: 24,
+                    child: IconButton(
+                      onPressed: _sendMessage,
+                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ),
+                  ),
               ],
             ),
           ),
