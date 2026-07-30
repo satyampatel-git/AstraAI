@@ -19,3 +19,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  speech_to_text: ^7.0.0
