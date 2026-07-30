@@ -19,18 +19,21 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: 'zulu'
+          java-version: '11'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
+      - name: Give Executable Permission to Gradle
+        run: chmod +x android/gradlew
+
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build APK (Debug/Unsigned Release)
+      - name: Build APK
         run: flutter build apk --debug
 
       - name: Upload APK Artifact
