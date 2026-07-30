@@ -23,9 +23,11 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Build APK
+      - name: Rebuild Android Config & Build APK
         run: |
           cd app
+          rm -rf android
+          flutter create --platforms=android .
           flutter pub get
           flutter build apk --debug
 
