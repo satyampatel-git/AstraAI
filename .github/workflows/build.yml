@@ -8,6 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,21 +25,16 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
           channel: 'stable'
 
-      - name: Detect Project Path and Build
-        run: |
-          if [ -d "app" ] && [ -f "app/pubspec.yaml" ]; then
-            echo "Building from app directory..."
-            cd app
-          fi
-          flutter pub get
-          flutter build apk --release
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AstraAI-Release
-          path: |
-            **/build/app/outputs/flutter-apk/app-release.apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
