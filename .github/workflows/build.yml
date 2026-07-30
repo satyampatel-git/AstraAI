@@ -23,11 +23,9 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Fix Gradle Project Structure and Build APK
+      - name: Build APK
         run: |
           cd app
-          flutter config --no-analytics
-          flutter create --platforms=android .
           flutter pub get
           flutter build apk --debug
 
