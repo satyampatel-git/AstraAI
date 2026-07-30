@@ -1,7 +1,6 @@
-name: astra_ai
-description: AstraAI Virtual Assistant
+name: app
+description: "AstraAI Flutter Application"
 publish_to: "none"
-
 version: 1.0.0+1
 
 environment:
@@ -10,14 +9,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
-
-  speech_to_text: ^7.0.0
