@@ -1,135 +1,117 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:flutter_tts/flutter_tts.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
-  runApp(const AstraAI());
+  runApp(const AstraAIApp());
 }
 
-class AstraAI extends StatelessWidget {
-  const AstraAI({super.key});
+class AstraAIApp extends StatelessWidget {
+  const AstraAIApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'AstraAI',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.deepPurpleAccent,
-        ),
+        scaffoldBackgroundColor: const Color(0xFF0D0F12),
+        primaryColor: const Color(0xFF6C5CE7),
+        textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
       ),
-      home: const VoiceHomeScreen(),
+      home: const ChatScreen(),
     );
   }
 }
 
-class VoiceHomeScreen extends StatefulWidget {
-  const VoiceHomeScreen({super.key});
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
 
   @override
-  State<VoiceHomeScreen> createState() => _VoiceHomeScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _VoiceHomeScreenState extends State<VoiceHomeScreen> {
-  late stt.SpeechToText _speech;
-  late FlutterTts _tts;
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _controller = TextEditingController();
+  final List<Map<String, String>> _messages = [
+    {"role": "assistant", "content": "Hello! Main AstraAI hoon. Main aapki kya madad kar sakta hoon?"}
+  ];
 
-  bool _isListening = false;
-  String _spokenText = "Mic button dabaiye aur boliye...";
-  String _aiResponse = "";
-
-  @override
-  void initState() {
-    super.initState();
-    _speech = stt.SpeechToText();
-    _tts = FlutterTts();
-  }
-
-  Future<void> _speak(String text) async {
-    await _tts.setLanguage("en-US");
-    await _tts.setPitch(1.0);
-    await _tts.speak(text);
-  }
-
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) => print('onStatus: $val'),
-        onError: (val) => print('onError: $val'),
-      );
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _spokenText = val.recognizedWords;
-            if (val.hasConfidenceRating && val.confidence > 0) {
-              _processCommand(_spokenText);
-            }
-          }),
-        );
-      }
-    } else {
-      setState(() => _isListening = false);
-      _speech.stop();
-    }
-  }
-
-  void _processCommand(String command) {
-    String response = "Maine suna: $command. Abhi main is par kaam kar raha hoon!";
+  void _sendMessage() {
+    if (_controller.text.trim().isEmpty) return;
     setState(() {
-      _aiResponse = response;
+      _messages.add({"role": "user", "content": _controller.text.trim()});
+      _controller.clear();
     });
-    _speak(response);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AstraAI Assistant'),
+        backgroundColor: const Color(0xFF161A23),
+        elevation: 0,
+        title: Text(
+          'AstraAI',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _isListening ? Icons.mic : Icons.mic_none,
-              size: 80,
-              color: _isListening ? Colors.redAccent : Colors.deepPurpleAccent,
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final isUser = _messages[index]["role"] == "user";
+                return Align(
+                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  containerChild: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isUser ? const Color(0xFF6C5CE7) : const Color(0xFF1E2230),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _messages[index]["content"]!,
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(height: 30),
-            Text(
-              _spokenText,
-              style: const TextStyle(fontSize: 18, color: Colors.white70),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            if (_aiResponse.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E2230),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
+                  ),
                 ),
-                child: Text(
-                  _aiResponse,
-                  style: const TextStyle(fontSize: 16, color: Colors.purpleAccent),
-                  textAlign: TextAlign.center,
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _sendMessage,
+                  icon: const Icon(Icons.send_rounded, color: Color(0xFF6C5CE7)),
                 ),
-              ),
-            const SizedBox(height: 40),
-            FloatingActionButton.extended(
-              onPressed: _listen,
-              icon: Icon(_isListening ? Icons.stop : Icons.mic),
-              label: Text(_isListening ? "Listening..." : "Start Talking"),
-              backgroundColor: Colors.deepPurpleAccent,
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

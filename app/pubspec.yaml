@@ -1,22 +1,27 @@
-name: app
-description: "AstraAI Flutter Application"
-publish_to: "none"
+name: astra_ai
+description: "AstraAI - Next-Gen Personal AI Assistant"
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_riverpod: ^2.5.1
+  google_generative_ai: ^0.4.0
+  flutter_spinkit: ^5.2.1
+  google_fonts: ^6.2.1
   speech_to_text: ^7.0.0
-  flutter_tts: ^4.2.0
-  cupertino_icons: ^1.0.8
+  flutter_tts: ^4.0.2
+  permission_handler: ^11.3.1
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
