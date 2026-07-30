@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
@@ -37,23 +38,24 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _messages = [
-    {"role": "assistant", "content": "Hello! Main AstraAI hoon. Main aapki kya madad kar sakta hoon?"}
+    {"role": "assistant", "content": "Hello! Main AstraAI hoon. Main bol bhi sakta hoon aur sun bhi sakta hoon. Poochiye kya puchna hai?"}
   ];
   
   bool _isLoading = false;
+  bool _isSpeaking = false;
   
-  // Replace with your API key
   static const String _apiKey = "YOUR_GEMINI_API_KEY_HERE";
   GenerativeModel? _model;
   ChatSession? _chat;
 
-  // Speech to Text members
   final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _flutterTts = FlutterTts();
   bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
+    _initTts();
     _requestMicrophonePermission();
     if (_apiKey != "YOUR_GEMINI_API_KEY_HERE") {
       _model = GenerativeModel(
@@ -64,27 +66,42 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _requestMicrophonePermission() async {
-    final status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Microphone permission denied. Voice feature unavailable.")),
-      );
+  void _initTts() {
+    _flutterTts.setStartHandler(() => setState(() => _isSpeaking = true));
+    _flutterTts.setCompletionHandler(() => setState(() => _isSpeaking = false));
+    _flutterTts.setErrorHandler((msg) => setState(() => _isSpeaking = false));
+    _flutterTts.setLanguage("hi-IN"); // Default Hindi/English friendly accent
+    _flutterTts.setSpeechRate(0.5);
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isNotEmpty) {
+      await _flutterTts.stop();
+      await _flutterTts.speak(text);
     }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await _flutterTts.stop();
+    setState(() => _isSpeaking = false);
+  }
+
+  Future<void> _requestMicrophonePermission() async {
+    await Permission.microphone.request();
   }
 
   void _listen() async {
     if (!_isListening) {
-      final available = await _speech.initialize(
+      bool available = await _speech.initialize(
         onStatus: (status) {
-          if (status == 'done') {
+          if (status == 'done' || status == 'notListening') {
             setState(() => _isListening = false);
-            if(_controller.text.isNotEmpty) {
-               _sendMessage();
+            if (_controller.text.isNotEmpty) {
+              _sendMessage();
             }
           }
         },
-        onError: (error) => print('Error: $error'),
+        onError: (error) => setState(() => _isListening = false),
       );
 
       if (available) {
@@ -95,7 +112,6 @@ class _ChatScreenState extends State<ChatScreen> {
               _controller.text = result.recognizedWords;
             });
           },
-          listenMode: stt.ListenMode.confirmation,
         );
       }
     } else {
@@ -108,10 +124,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty || _isLoading) return;
 
-    if(_speech.isListening){
-       _speech.stop();
-       setState(() => _isListening = false);
-    }
+    if (_isSpeaking) _stopSpeaking();
 
     setState(() {
       _messages.add({"role": "user", "content": text});
@@ -122,28 +135,25 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       if (_model == null) {
         await Future.delayed(const Duration(seconds: 1));
+        const fallbackText = "API Key set nahi hai! Kripya 'YOUR_GEMINI_API_KEY_HERE' ko apni API Key se replace karein.";
         setState(() {
-          _messages.add({
-            "role": "assistant",
-            "content": "API Key abhi set nahi hai! Kripya code mein 'YOUR_GEMINI_API_KEY_HERE' ko apni API Key se replace karein."
-          });
+          _messages.add({"role": "assistant", "content": fallbackText});
         });
+        _speak(fallbackText);
       } else {
         final content = Content.text(text);
         final response = await _chat!.sendMessage(content);
+        final aiResponse = response.text ?? "Mujhe samajh nahi aaya.";
+        
         setState(() {
-          _messages.add({
-            "role": "assistant", 
-            "content": response.text ?? "Mujhe samajh nahi aaya, kripya dobara poochein."
-          });
+          _messages.add({"role": "assistant", "content": aiResponse});
         });
+        _speak(aiResponse);
       }
     } catch (e) {
+      final errorMsg = "Error: Response fetch nahi ho paya. ($e)";
       setState(() {
-        _messages.add({
-          "role": "assistant",
-          "content": "Error: Response fetch nahi ho paya. ($e)"
-        });
+        _messages.add({"role": "assistant", "content": errorMsg});
       });
     } finally {
       setState(() {
@@ -158,11 +168,15 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF161A23),
         elevation: 0,
-        title: Text(
-          'AstraAI',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: Text('AstraAI', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
+        actions: [
+          if (_isSpeaking)
+            IconButton(
+              icon: const Icon(Icons.volume_off, color: Colors.redAccent),
+              onPressed: _stopSpeaking,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -179,12 +193,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isUser ? const Color(0xFF6C5CE7) : const Color(0xFF1E2230),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(isUser ? 16 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 16),
-                      ),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       _messages[index]["content"]!,
@@ -198,10 +207,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: SpinKitThreeBounce(
-                color: Color(0xFF6C5CE7),
-                size: 24.0,
-              ),
+              child: SpinKitThreeBounce(color: Color(0xFF6C5CE7), size: 24.0),
             ),
           Padding(
             padding: const EdgeInsets.all(12.0),
@@ -211,16 +217,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _controller,
                     style: const TextStyle(color: Colors.white),
-                    maxLines: null,
                     decoration: InputDecoration(
-                      hintText: 'AstraAI se kuch bhi poochein...',
+                      hintText: 'Ask AstraAI...',
                       hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
                       filled: true,
                       fillColor: const Color(0xFF1E2230),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     ),
                   ),
@@ -231,22 +233,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   radius: 24,
                   child: IconButton(
                     onPressed: _listen,
-                    icon: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none,
-                        color: Colors.white, size: 24),
+                    icon: Icon(_isListening ? Icons.mic : Icons.mic_none, color: Colors.white),
                   ),
                 ),
-                if (_controller.text.isNotEmpty)
-                  const SizedBox(width: 8),
-                if (_controller.text.isNotEmpty)
-                   CircleAvatar(
-                    backgroundColor: const Color(0xFF6C5CE7),
-                    radius: 24,
-                    child: IconButton(
-                      onPressed: _sendMessage,
-                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                    ),
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF6C5CE7),
+                  radius: 24,
+                  child: IconButton(
+                    onPressed: _sendMessage,
+                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                   ),
+                ),
               ],
             ),
           ),
